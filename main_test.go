@@ -686,6 +686,77 @@ func TestAddTrafficAggregatesSameHour(t *testing.T) {
 	}
 }
 
+func TestHandleTrafficIncludesPendingLiveUsage(t *testing.T) {
+	app := newTestApp(t)
+	site, err := app.db.CreateSite("live", freePort(t), "http://127.0.0.1:8096", "", "direct", "[]", "infuse", 0, 0)
+	if err != nil {
+		t.Fatalf("CreateSite: %v", err)
+	}
+
+	app.db.AddTraffic(site.ID, 10, 20)
+	inst := &ProxyInstance{Site: *site, server: &http.Server{}}
+	inst.bytesIn.Store(3)
+	inst.bytesOut.Store(4)
+	app.pm.proxies[site.ID] = inst
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/traffic/"+jsonNumber64(site.ID)+"?hours=1", nil)
+
+	app.handleTraffic(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var logs []TrafficLog
+	if err := json.Unmarshal(rr.Body.Bytes(), &logs); err != nil {
+		t.Fatalf("decode traffic logs: %v body=%s", err, rr.Body.String())
+	}
+	if len(logs) != 1 {
+		t.Fatalf("len(logs) = %d, want 1: %+v", len(logs), logs)
+	}
+	if logs[0].BytesIn != 13 || logs[0].BytesOut != 24 {
+		t.Fatalf("live merged log = in:%d out:%d", logs[0].BytesIn, logs[0].BytesOut)
+	}
+}
+
+func TestHandleSitesIncludesPendingLiveTrafficUsed(t *testing.T) {
+	app := newTestApp(t)
+	site, err := app.db.CreateSite("live-sites", freePort(t), "http://127.0.0.1:8096", "", "direct", "[]", "infuse", 0, 0)
+	if err != nil {
+		t.Fatalf("CreateSite: %v", err)
+	}
+
+	app.db.AddTraffic(site.ID, 100, 200)
+	inst := &ProxyInstance{Site: *site, server: &http.Server{}}
+	inst.bytesIn.Store(30)
+	inst.bytesOut.Store(40)
+	app.pm.proxies[site.ID] = inst
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/sites", nil)
+
+	app.handleSites(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var sites []struct {
+		ID          int64 `json:"id"`
+		TrafficUsed int64 `json:"traffic_used"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &sites); err != nil {
+		t.Fatalf("decode sites: %v body=%s", err, rr.Body.String())
+	}
+	if len(sites) != 1 {
+		t.Fatalf("len(sites) = %d, want 1", len(sites))
+	}
+	if sites[0].TrafficUsed != 370 {
+		t.Fatalf("traffic_used = %d, want 370", sites[0].TrafficUsed)
+	}
+}
+
 func TestHandleSitesCreatePersistsPlaybackTargetURL(t *testing.T) {
 	app := newTestApp(t)
 
