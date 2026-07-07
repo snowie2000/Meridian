@@ -44,6 +44,7 @@ async function loadTrafficSites() {
     sel.innerHTML = sites.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
     loadTrafficChart();
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     Toast.error('加载站点失败');
   }
 }
@@ -80,6 +81,7 @@ async function loadTrafficChart() {
 
     drawTrafficChart(logs, hours);
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     console.error('Traffic load error:', e);
   }
 }

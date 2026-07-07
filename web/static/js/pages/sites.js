@@ -82,6 +82,7 @@ async function loadSites() {
       </div>`;
     }).join('');
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     Toast.error('加载站点失败: ' + e.message);
   }
 }
@@ -261,6 +262,7 @@ function showSiteModal(site) {
       closeModal();
       loadSites();
     } catch (e) {
+      if (API.isAuthExpiredError(e)) return;
       Toast.error(e.message);
     }
   };
@@ -275,6 +277,7 @@ window.toggleSiteAction = async function(id) {
     Toast.success(res.enabled ? '站点已启用' : '站点已停用');
     loadSites();
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     Toast.error(e.message);
   }
 };
@@ -285,6 +288,7 @@ window.editSiteAction = async function(id) {
     const site = sites.find(s => s.id === id);
     if (site) showSiteModal(site);
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     Toast.error(e.message);
   }
 };
@@ -306,6 +310,7 @@ window.confirmDelete = async function(id) {
     closeModal();
     loadSites();
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     Toast.error(e.message);
   }
 };

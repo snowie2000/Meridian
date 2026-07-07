@@ -80,6 +80,10 @@ async function startFetchSSE() {
       signal: controller.signal,
     });
 
+    if (resp.status === 401) {
+      API.handleAuthExpired();
+      return;
+    }
     if (!resp.ok) throw new Error('SSE failed');
     if (dashAbortController !== controller) return;
 
@@ -192,6 +196,7 @@ async function loadDashboardTable() {
       </tr>
     `).join('');
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     console.error('Dashboard table load error:', e);
   }
 }

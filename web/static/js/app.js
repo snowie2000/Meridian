@@ -31,22 +31,26 @@
   document.getElementById('modal-close').addEventListener('click', closeModal);
 
   async function checkAuth() {
-    if (API.token) {
-      enterApp();
-      return;
-    }
-
     try {
       const res = await API.checkSetup();
       authStatus = Object.assign({}, authStatus, res || {});
       if (res.needs_setup) {
+        API.logout();
         showSetupMode();
         return;
       }
+
+      if (API.token) {
+        await API.dashboard();
+        enterApp();
+        return;
+      }
     } catch (e) {
-      // Server not available, just show login
+      if (API.isAuthExpiredError(e)) return;
+      // Server not available or stored session invalid, just show login
     }
 
+    API.logout();
     showLoginMode();
   }
 
@@ -101,6 +105,21 @@
     if (typeof stopDashSSE === 'function') stopDashSSE();
   }
 
+  function showLoggedOutShell() {
+    teardownAppRuntime();
+    if (typeof closeModal === 'function') closeModal();
+    API.logout();
+    loginEl.classList.remove('hidden');
+    shellEl.classList.remove('active');
+    showLoginMode();
+    document.getElementById('inp-password').value = '';
+  }
+
+  window.addEventListener('meridian:auth-expired', function() {
+    showLoggedOutShell();
+    Toast.info('登录已过期，请重新登录');
+  });
+
   document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const username = document.getElementById('inp-username').value.trim();
@@ -128,6 +147,7 @@
         res = await API.login(username, password);
         Toast.success('欢迎回来, ' + res.username + '!');
       }
+      API.authExpiredNotified = false;
       API.token = res.token;
       API.username = res.username;
       enterApp();
@@ -168,12 +188,7 @@
   document.getElementById('avatar-btn').addEventListener('click', function() {
     if (!confirm('确认退出登录？')) return;
 
-    teardownAppRuntime();
-    API.logout();
-    loginEl.classList.remove('hidden');
-    shellEl.classList.remove('active');
-    showLoginMode();
-    document.getElementById('inp-password').value = '';
+    showLoggedOutShell();
     Toast.info('已退出登录');
   });
 

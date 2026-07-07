@@ -31,6 +31,7 @@ async function loadDiagSites() {
     }
     sel.innerHTML = sites.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     Toast.error('加载站点失败');
   }
 }
@@ -79,6 +80,7 @@ async function runDiag() {
 
     document.getElementById('diag-grid').innerHTML = cards.filter(Boolean).join('');
   } catch (e) {
+    if (API.isAuthExpiredError(e)) return;
     Toast.error('诊断失败: ' + e.message);
   } finally {
     btn.classList.remove('running');

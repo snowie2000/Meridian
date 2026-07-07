@@ -5,6 +5,18 @@ const API = {
   get username() { return localStorage.getItem('meridian_user') || ''; },
   set username(v) { v ? localStorage.setItem('meridian_user', v) : localStorage.removeItem('meridian_user'); },
 
+  authExpiredNotified: false,
+
+  isAuthExpiredError(err) {
+    return !!(err && err.authExpired);
+  },
+
+  handleAuthExpired() {
+    if (this.authExpiredNotified) return;
+    this.authExpiredNotified = true;
+    window.dispatchEvent(new CustomEvent('meridian:auth-expired'));
+  },
+
   async request(method, path, body) {
     const opts = {
       method,
@@ -14,8 +26,16 @@ const API = {
     if (body) opts.body = JSON.stringify(body);
 
     const res = await fetch(path, opts);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Request failed');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || 'Request failed');
+      err.status = res.status;
+      if (res.status === 401 && !path.startsWith('/api/auth/')) {
+        err.authExpired = true;
+        this.handleAuthExpired();
+      }
+      throw err;
+    }
     return data;
   },
 
